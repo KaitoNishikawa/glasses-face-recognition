@@ -1,6 +1,7 @@
 import numpy as np 
 from PIL import Image
 import os 
+import re
 
 directory = "Dataset"
 def is_valid_image_pillow(file_name):
@@ -27,6 +28,7 @@ for filename in os.listdir(directory):
         resized_array = np.array(resized_image)
 
         im = Image.fromarray(resized_array)
-        im.save(f"formatted_dataset/{filename}.jpeg")
+        new_filename = re.sub(r'\..*$', '', filename)
+        im.save(f"formatted_dataset/{new_filename}.jpeg")
 
 print(resized_array.shape)
