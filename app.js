@@ -2,42 +2,114 @@
 const express = require("express"),
 bodyParser = require("body-parser"),
 { urlencoded, json } = require("body-parser"),
-config = require('./config'),
+config = require('./config');
+const dotenv = require('dotenv');
+
+// const fetch = require('node-fetch'); // Ensure you have node-fetch installed: npm install node-fetch
+const fs = require('fs');
+
+dotenv.config();
+
 app = express().use(bodyParser.json());
-    
 
-app.post("/messaging-webhook", (req, res) => {
-    let body = req.body;
+// app.post("/messaging-webhook", (req, res) => {
+//     let body = req.body;
   
-    console.log(`\u{1F7EA} Received webhook:`);
-    console.dir(body, { depth: null });
+//     console.log(`\u{1F7EA} Received webhook:`);
+//     console.dir(body, { depth: null });
 
-    // Send a 200 OK response if this is a page webhook
+//     // Send a 200 OK response if this is a page webhook
 
-  if (body.object === "page") {
-    // Returns a '200 OK' response to all requests
-    res.status(200).send("EVENT_RECEIVED");
+//   if (body.object === "page") {
+//     // Returns a '200 OK' response to all requests
+//     res.status(200).send("EVENT_RECEIVED");
 
-    // Determine which webhooks were triggered and get sender PSIDs and locale, message content and more.
-    // Iterate over each entry - there may be multiple if batched
-    body.entry.forEach(function(entry) {
+//     // Determine which webhooks were triggered and get sender PSIDs and locale, message content and more.
+//     // Iterate over each entry - there may be multiple if batched
+//     body.entry.forEach(function(entry) {
 
-      // Get the webhook event. entry.messaging is an array, but 
-      // will only ever contain one event, so we get index 0
-      let webhook_event = entry.messaging[0];
-      console.log(webhook_event);
+//       // Get the webhook event. entry.messaging is an array, but 
+//       // will only ever contain one event, so we get index 0
+//       let webhook_event = entry.messaging[0];
+//       console.log(webhook_event);
 
-      // Get the sender PSID
-      let sender_psid = webhook_event.sender.id;
-      console.log('Sender PSID: ' + sender_psid);
+//       // Get the sender PSID
+//       let sender_psid = webhook_event.sender.id;
+//       console.log('Sender PSID: ' + sender_psid);
       
-    });
+//     });
 
-  } else {
-    // Return a '404 Not Found' if event is not from a page subscription
-    res.sendStatus(404);
-  }
+//   } else {
+//     // Return a '404 Not Found' if event is not from a page subscription
+//     res.sendStatus(404);
+//   }
+// });
+
+app.post("/messaging-webhook", function (request, response) {
+  console.log(request.body);
+  console.log('Incoming webhook: ' + JSON.stringify(request.body));
+
+  // for text
+  // console.log('Message contents: ' + JSON.stringify(request.body.entry[0].changes[0].value.messages[0].text.body));
+
+  // for image
+  console.log('Message contents: ' + JSON.stringify(request.body.entry[0].changes[0].value.messages[0].image));
+
+  const accessToken = process.env.ACCESS_TOKEN;
+
+  const headers = {
+    'Authorization': `Bearer ${process.env.ACCESS_TOKEN}`
+  };
+
+  const imageUrl = `https://graph.facebook.com/v11.0/${request.body.entry[0].changes[0].value.messages[0].image.id}?access_token=${accessToken}`;
+  console.log('Image URL: ' + imageUrl);
+
+  getMediaUrl(imageUrl, headers);
+  response.sendStatus(200);
 });
+
+// Function to get the media URL
+async function getMediaUrl(mediaUrl, headers) {
+  try {
+    const response = await fetch(mediaUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    const actualMediaUrl = data.url; 
+    console.log('Media URL:', actualMediaUrl);
+
+    // Dynamically import the open module
+    const open = (await import('open')).default;
+
+    
+    downloadMedia(actualMediaUrl, headers, './media_file.jpeg');
+
+    // Open the media URL in the default web browser
+    // await open(actualMediaUrl);
+  } catch (error) {
+    console.error('Error retrieving media URL:', error.message);
+    if (error.response) {
+      const errorData = await error.response.json();
+      console.error('Error details:', errorData);
+    }
+  }
+}
+
+// Function to download the media file
+async function downloadMedia(url, headers, filePath) {
+  try {
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const buffer = await response.buffer();
+    fs.writeFileSync(filePath, buffer);
+    console.log('Media file downloaded successfully');
+  } catch (error) {
+    console.error('Error downloading media file:', error.message);
+  }
+}
 
 // Add support for GET requests to our webhook
 app.get("/messaging-webhook", (req, res) => {
@@ -104,3 +176,5 @@ app.listen(PORT, () => {
 });
 
 console.log('hello world')
+// const accessToken = process.env.ACCESS_TOKEN;
+// console.log('Access token: ' + accessToken);
